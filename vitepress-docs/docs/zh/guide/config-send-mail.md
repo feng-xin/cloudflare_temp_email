@@ -48,6 +48,12 @@ send_email = [
 
 注册 `https://resend.com/domains` 根据提示添加 DNS 记录,
 
+> [!WARNING] Cloudflare 上 DNS 记录的代理状态
+> Resend 域名验证的 CNAME 记录**必须设置为 仅 DNS**（灰云），在
+> Cloudflare DNS 控制面板中代理（橙云）记录会阻止 Resend
+> 完成验证，且一次失败的尝试可能需要数小时才能重试。
+> 参见 [#515](https://github.com/dreamhunter2333/cloudflare_temp_email/issues/515)。
+
 `API KEYS` 页面创建 `api key`
 
 然后执行下面的命令，将 `RESEND_TOKEN` 添加到 secrets 中
@@ -148,14 +154,14 @@ wrangler secret put SMTP_CONFIG
 
 用户发送邮件需要有发信余额。余额机制如下：
 
-1. **申请发信权限**：用户需要先在前端界面点击「申请发信权限」按钮
-2. **默认额度**：申请时会获得 `DEFAULT_SEND_BALANCE` 环境变量设置的默认额度（如果未设置则为 0）
+1. **自动初始化默认额度**：当 `DEFAULT_SEND_BALANCE > 0` 时，用户打开前端发信页或第一次调用发信接口时，系统会自动为该地址初始化默认额度
+2. **手动申请**：如果 `DEFAULT_SEND_BALANCE = 0`，用户仍可以在前端界面点击「申请发信权限」按钮，创建待管理员处理的发信权限记录
 3. **无限制发送**：以下方式可以跳过余额检查：
    - 在 admin 后台将地址加入「无限制发送地址列表」
    - 配置 `NO_LIMIT_SEND_ROLE` 环境变量，指定可以无限发送的用户角色
 
 > [!NOTE]
-> `DEFAULT_SEND_BALANCE` **不会**自动给所有地址充值余额，用户必须先主动申请发信权限，额度才会生效。
+> `DEFAULT_SEND_BALANCE` 仅在地址尚无 `address_sender` 记录时自动插入初始额度（`ON CONFLICT DO NOTHING`），已有记录（包括管理员禁用或手动设置的行）一律保持原样，runtime 不会修改；历史异常或被禁用的地址需由管理员在后台手动启用并设置余额。
 >
 > 第 1 层 `verifiedAddressList` 命中时不扣余额，但同样计入发信额度；第 2/3/4 层统一扣 balance。
 >
